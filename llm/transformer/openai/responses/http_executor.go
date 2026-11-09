@@ -3,6 +3,7 @@ package responses
 import (
 	"context"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/tidwall/gjson"
@@ -26,8 +27,8 @@ func (e *httpTransportExecutor) DoStream(ctx context.Context, request *httpclien
 	return e.inner.DoStream(ctx, e.finalize(request))
 }
 
-// PrepareHTTPTransportRequest removes WebSocket-v2-only request metadata before
-// an HTTP/SSE attempt. Generic Responses HTTP requests retain a normal
+// PrepareHTTPTransportRequest normalizes WebSocket-v2 metadata and App page context
+// before an HTTP/SSE attempt. Generic Responses HTTP requests retain a normal
 // previous_response_id. Codex callers can force removal because their HTTP
 // endpoint does not support that field.
 func PrepareHTTPTransportRequest(request *httpclient.Request, stripPreviousResponseID bool) *httpclient.Request {
@@ -40,6 +41,33 @@ func PrepareHTTPTransportRequest(request *httpclient.Request, stripPreviousRespo
 	bodyChanged := false
 	if stripPreviousResponseID {
 		body, bodyChanged = withoutPreviousResponseID(body)
+	}
+	input := gjson.GetBytes(body, "input")
+	if input.IsArray() {
+		for index, item := range input.Array() {
+			name := item.Get("name").String()
+			if item.Get("type").String() != "function_call_output" || item.Get("call_id").String() != "" ||
+				(name != "codex_apps_open_page" && !strings.HasPrefix(name, "codex_apps_selected_page_part_")) {
+				continue
+			}
+			output := item.Get("output")
+			if output.Type != gjson.String {
+				continue
+			}
+
+			// App page context is untrusted input, not the result of a model-requested tool call.
+			message := map[string]string{
+				"type":    "message",
+				"role":    "user",
+				"content": "<external_" + name + ">\n" + output.String() + "\n</external_" + name + ">",
+			}
+			updated, err := sjson.SetBytes(body, "input."+strconv.Itoa(index), message)
+			if err != nil {
+				continue
+			}
+			body = updated
+			bodyChanged = true
+		}
 	}
 
 	if !webSocketBetaRemoved && !bodyChanged {

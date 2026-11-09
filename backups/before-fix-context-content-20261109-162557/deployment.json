@@ -1,0 +1,18 @@
+{
+  "backup": "/Users/shuirunjie/Documents/axonhub-src/backups/before-fix-context-content-20261109-162557",
+  "health_before": {
+    "status": "healthy",
+    "timestamp": "2026-11-09T16:26:00.038688+08:00",
+    "version": "v1.0.0-beta12",
+    "build": {
+      "version": "v1.0.0-beta12",
+      "commit": "2b1a0f9321a4f783a4cceb2b4eb3a8303074487e",
+      "go_version": "go1.27.3",
+      "platform": "darwin/arm64",
+      "uptime": "38m8.843232709s"
+    },
+    "uptime": "38m8.843232709s"
+  },
+  "database_quick_check": "ok",
+  "log_offset": 62214
+}
